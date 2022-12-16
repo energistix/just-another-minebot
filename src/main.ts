@@ -1,18 +1,22 @@
 import { createBot, Bot as MCBot } from "mineflayer"
 import { pathfinder, ComputedPath } from "mineflayer-pathfinder"
-import { Vec3 } from "vec3"
-import settings from "../settings.json"
+import vec3 from "vec3"
+// prettier-ignore
+import settings from "../settings.json" /* prettier-ignore */ assert /* prettier-ignore */ { type: "json" }
 import * as actions from "./actions.js"
+
+const commands = []
 
 class Bot {
   mcBot: MCBot
-  path: ComputedPath | null = null
+  path: any | null = null
   static bots: Bot[] = []
   static commands: string[][] = []
   // TODO: find out what those are
   tasks: string[] = []
   todos: string[][] = []
   constructor() {
+    Bot.bots.push(this)
     this.mcBot = createBot({
       host: "localhost",
       username: `Bot#${Bot.bots.length}`
@@ -22,9 +26,9 @@ class Bot {
     this.mcBot.on("kicked", (reason, loggedIn) => console.log(reason, loggedIn))
     this.mcBot.on("error", (err) => console.log(err))
 
-    this.mcBot.on("blockUpdate", this.updatePath.call(this))
-    this.mcBot.on("chunkColumnLoad", this.updatePath.call(this))
-    setInterval(this.updatePath.call(this), 2000)
+    this.mcBot.on("blockUpdate", this.updatePath.bind(this))
+    this.mcBot.on("chunkColumnLoad", this.updatePath.bind(this))
+    setInterval(this.updatePath.bind(this), 2000)
   }
   updatePath() {
     //TODO: i'll figure out pathfinding later
@@ -81,7 +85,7 @@ class Bot {
   runCommand(tokens) {
     switch (tokens[0]) {
       case "break":
-        actions.clearBlock(this, new Vec3(parseInt(tokens[1]), parseInt(tokens[2]), parseInt(tokens[3])))
+        actions.clearBlock(this, new vec3.Vec3(parseInt(tokens[1]), parseInt(tokens[2]), parseInt(tokens[3])))
         break
       case "collect":
         // Get a type of item by both mining and hunting on loop.
@@ -97,7 +101,7 @@ class Bot {
         //Can also include the type of item to deposit.
         //If no position is specified it'll use the default. (dropoff location)
 
-        const location = new Vec3(parseInt(tokens[1]), parseInt(tokens[2]), parseInt(tokens[3]))
+        const location = new vec3.Vec3(parseInt(tokens[1]), parseInt(tokens[2]), parseInt(tokens[3]))
 
         //Or just use default location.
         actions.deposit(this, location)
@@ -115,12 +119,12 @@ class Bot {
         break
       case "goto":
         //Go to specified position.
-        actions.pathfind(this, new Vec3(parseInt(tokens[1]), parseInt(tokens[2]), parseInt(tokens[3])), 1)
+        actions.pathfind(this, new vec3.Vec3(parseInt(tokens[1]), parseInt(tokens[2]), parseInt(tokens[3])), 1)
         break
       case "quarry": {
         //Dig a quarry between points A & B.
-        const pointA = new Vec3(parseInt(tokens[1]), parseInt(tokens[2]), parseInt(tokens[3]))
-        const pointB = new Vec3(parseInt(tokens[4]), parseInt(tokens[5]), parseInt(tokens[6]))
+        const pointA = new vec3.Vec3(parseInt(tokens[1]), parseInt(tokens[2]), parseInt(tokens[3]))
+        const pointB = new vec3.Vec3(parseInt(tokens[4]), parseInt(tokens[5]), parseInt(tokens[6]))
         actions.clearArea(this, pointA, pointB)
         break
       }
@@ -132,3 +136,44 @@ class Bot {
 }
 
 export { Bot }
+
+const lastJoin = Date.now()
+const spawning = false
+
+async function cosmicLooper() {
+  const time = Date.now()
+
+  if (!spawning && Bot.bots.length < settings.maxBots && time - lastJoin > settings.spawnDelay) {
+    new Bot()
+  }
+
+  for (const bot of Bot.bots) {
+    if (!bot.tasks.length) {
+      if (bot.todos.length) {
+        bot.runCommand(bot.todos[0])
+        bot.todos.shift()
+      } else if (commands.length) {
+        bot.runCommand(commands[0])
+        commands.shift()
+      }
+    }
+  }
+
+  if (Bot.bots.length) {
+    console.clear()
+    for (const bot of Bot.bots) {
+      console.log(`${bot.mcBot.username}:  ${bot.tasks.join(" > ")}`)
+    }
+  }
+  setTimeout(cosmicLooper, 100)
+}
+
+new Bot()
+
+Bot.bots[0].mcBot.once("spawn", () => {
+  const bot = Bot.bots[0]
+
+  bot.mcBot.on("chat", bot.processCommand.bind(bot))
+  bot.mcBot.on("whisper", bot.processCommand.bind(bot))
+  cosmicLooper()
+})

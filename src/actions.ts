@@ -2,13 +2,13 @@ import * as pathfinder from "./pathfinder.js"
 import * as fs from "fs"
 import { Bot } from "./main.js"
 import * as mcfinder from "./mc-finder.js"
-import { Vec3 } from "vec3"
+import vec3 from "vec3"
 import { EquipmentDestination } from "mineflayer"
 
 import _mcdata from "minecraft-data"
 const mcdata = _mcdata("1.16.5")
 
-import { Item } from "prismarine-item"
+import prismarineItem from "prismarine-item"
 
 const tools = fs.readFileSync("tool-list.txt", "utf8").split("\r\n")
 const smelting = JSON.parse(fs.readFileSync("smelting.json", "utf8"))
@@ -17,22 +17,22 @@ function sleep(time) {
   return new Promise((resolve) => setTimeout(resolve, time))
 }
 
-export async function pathfind(bot, position, range = 1, maxLoops = 300) {
-  const tracker = bot.task.length
-  bot.task.push(`pathfind ${range}`)
+export async function pathfind(bot: Bot, position, range = 1, maxLoops = 300) {
+  const tracker = bot.tasks.length
+  bot.tasks.push(`pathfind ${range}`)
 
-  if (bot.entity.position.distanceTo(position) <= range) {
-    bot.task.pop()
+  if (bot.mcBot.entity.position.distanceTo(position) <= range) {
+    bot.tasks.pop()
     return
   }
 
-  let botPosition = bot.entity.position
-  let path = pathfinder.path(bot, bot.entity.position, position, range, maxLoops)
+  let botPosition = bot.mcBot.entity.position
+  let path = pathfinder.path(bot, bot.mcBot.entity.position, position, range, maxLoops)
 
   if (!path.length) {
     await sleep(2000)
-    botPosition = bot.entity.position
-    path = pathfinder.path(bot, bot.entity.position, position, range, maxLoops)
+    botPosition = bot.mcBot.entity.position
+    path = pathfinder.path(bot, bot.mcBot.entity.position, position, range, maxLoops)
   }
 
   bot.path = {
@@ -48,7 +48,7 @@ export async function pathfind(bot, position, range = 1, maxLoops = 300) {
     path = bot.path.path
     //path = pathfinder.path(bot, botPosition, position, range, maxLoops);
 
-    bot.task[tracker] = `pathfind ${path.length}/${originalLength} <${range}`
+    bot.tasks[tracker] = `pathfind ${path.length}/${originalLength} <${range}`
 
     if (path.length) {
       const distanceA = botPosition.distanceTo(path[path.length - 1].position)
@@ -65,12 +65,12 @@ export async function pathfind(bot, position, range = 1, maxLoops = 300) {
 
     await sleep(100)
 
-    botPosition = bot.entity.position
+    botPosition = bot.mcBot.entity.position
   }
 
   bot.path = null
-  bot.clearControlStates()
-  bot.task.pop()
+  bot.mcBot.clearControlStates()
+  bot.tasks.pop()
 }
 
 export async function getItem(bot: Bot, item: string) {
@@ -115,21 +115,21 @@ export async function getItem(bot: Bot, item: string) {
   bot.tasks.pop()
 }
 
-export async function clearBlock(bot, position) {
-  bot.task.push("clear block")
+export async function clearBlock(bot: Bot, position: vec3.Vec3) {
+  bot.tasks.push("clear block")
 
   await pathfind(bot, position, 2)
 
-  const block = bot.blockAt(position)
+  const block = bot.mcBot.blockAt(position)
 
-  if (bot.game.gameMode == "survival") {
-    const availableTools = bot.inventory.slots.filter((slot) => {
+  if (bot.mcBot.game.gameMode == "survival") {
+    const availableTools = bot.mcBot.inventory.slots.filter((slot) => {
       if (!slot) return
       return block.canHarvest(slot.type)
     })
 
     if (availableTools.length) {
-      await bot.equip(availableTools[0].type, "hand")
+      await bot.mcBot.equip(availableTools[0].type, "hand")
     } else if (!block.canHarvest(null)) {
       const tool = tools.find((toolName) => {
         return block.canHarvest(mcdata.itemsByName[toolName].id)
@@ -143,9 +143,9 @@ export async function clearBlock(bot, position) {
   }
 
   await pathfind(bot, position, 2)
-  await bot.dig(block, true)
+  await bot.mcBot.dig(block, true)
 
-  bot.task.pop()
+  bot.tasks.pop()
 }
 
 const fuels = ["coal", "oak_log"]
@@ -288,7 +288,7 @@ async function craftItem(bot: Bot, item: string) {
   bot.tasks.pop()
 }
 
-async function placeBlock(bot: Bot, position: Vec3, type = "dirt") {
+async function placeBlock(bot: Bot, position: vec3.Vec3, type = "dirt") {
   bot.tasks.push("place block")
 
   await pathfind(bot, position, 4)
@@ -300,7 +300,7 @@ async function placeBlock(bot: Bot, position: Vec3, type = "dirt") {
   await pathfind(bot, position, 4)
 
   const referenceBlock = bot.mcBot.blockAt(position.offset(0, -1, 0), false)
-  await bot.mcBot.placeBlock(referenceBlock, new Vec3(0, 1, 0)).catch(console.log)
+  await bot.mcBot.placeBlock(referenceBlock, new vec3.Vec3(0, 1, 0)).catch(console.log)
 
   bot.tasks.pop()
 }
@@ -312,7 +312,7 @@ export async function equip(bot: Bot, item: string, slot: EquipmentDestination =
 
   if (!checkInventory(bot, item)) {
     if (bot.mcBot.game.gameMode == "creative") {
-      await bot.mcBot.creative.setInventorySlot(36, new Item(itemType, 1))
+      await bot.mcBot.creative.setInventorySlot(36, new prismarineItem.Item(itemType, 1))
     } else {
       await getItem(bot, item)
     }
@@ -361,7 +361,7 @@ export async function collectItem(bot: Bot, itemName: string, quantity: number) 
   bot.tasks.pop()
 }
 
-export async function deposit(bot: Bot, position: Vec3) {
+export async function deposit(bot: Bot, position: vec3.Vec3) {
   bot.tasks.push(`deposit`)
 
   await pathfind(bot, position, 4)
@@ -397,7 +397,7 @@ export async function deposit(bot: Bot, position: Vec3) {
   bot.tasks.pop()
 }
 
-export async function clearArea(bot: Bot, pointA: Vec3, pointB: Vec3) {
+export async function clearArea(bot: Bot, pointA: vec3.Vec3, pointB: vec3.Vec3) {
   bot.tasks.push(`quarry`)
 
   const minX = Math.min(pointA.x, pointB.x)
@@ -416,7 +416,7 @@ export async function clearArea(bot: Bot, pointA: Vec3, pointB: Vec3) {
       while (z < maxZ && z > minZ - 1) {
         for (let xx = 0; xx < 4 && x + xx < maxX; xx++) {
           const k = x + xx
-          await clearBlock(bot, new Vec3(k, y, z))
+          await clearBlock(bot, new vec3.Vec3(k, y, z))
         }
         z += zD
       }
@@ -432,7 +432,11 @@ export async function give(bot: Bot, username: string, itemName: string, quantit
   bot.tasks.push(`give ${username} ${itemName} x${quantity}`)
 
   const player = bot.mcBot.players[username]
-  const itemID = mcdata.itemsByName[itemName].id
+  const itemID = mcdata.itemsByName[itemName]?.id
+  if (!itemID) {
+    bot.tasks.pop()
+    return bot.mcBot.chat(`Item ${itemName} not found.`)
+  }
 
   await collectItem(bot, itemName, quantity)
 

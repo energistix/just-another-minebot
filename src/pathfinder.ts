@@ -1,7 +1,7 @@
-import { Vec3 } from "vec3"
+import vec3 from "vec3"
 import { Bot } from "./main.js"
 
-function neighbours(bot: Bot, p: Vec3) {
+function neighbours(bot: Bot, p: vec3.Vec3) {
   const points = [p.offset(0, 0, -1), p.offset(0, 0, 1), p.offset(-1, 0, 0), p.offset(1, 0, 0)]
 
   for (const i in points) {
@@ -20,12 +20,12 @@ function neighbours(bot: Bot, p: Vec3) {
   })
 }
 
-function clean(bot: Bot, n: Vec3, x = 0, y = 0, z = 0) {
+function clean(bot: Bot, n: vec3.Vec3, x = 0, y = 0, z = 0) {
   const b = bot.mcBot.blockAt(n.offset(x, y, z))
   return b && (b.displayName.includes("Air") || b.material == "plant")
 }
 
-function gridWalk(bot: Bot, goal: Vec3) {
+function gridWalk(bot: Bot, goal: vec3.Vec3) {
   const botPos = bot.mcBot.entity.position
 
   goal = goal.offset(-bot.mcBot.entity.position.x, -bot.mcBot.entity.position.y, -bot.mcBot.entity.position.z)
@@ -42,13 +42,13 @@ function gridWalk(bot: Bot, goal: Vec3) {
   }
 }
 
-function pathfind(bot: Bot, start: Vec3, end: Vec3, range = 1, maxLoops = 100) {
+function pathfind(bot: Bot, start: vec3.Vec3, end: vec3.Vec3, range = 1, maxLoops = 100) {
   const openList = []
   const closedList = []
   const initDist = start.distanceTo(end)
   let loops = 0
 
-  start = new Vec3(Math.floor(start.x) + 0.5, Math.floor(start.y), Math.floor(start.z) + 0.5)
+  start = new vec3.Vec3(Math.floor(start.x) + 0.5, Math.floor(start.y), Math.floor(start.z) + 0.5)
 
   openList.push({
     position: start,
