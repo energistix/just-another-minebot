@@ -42,8 +42,16 @@ function gridWalk(bot: Bot, goal: vec3.Vec3) {
   }
 }
 
-function pathfind(bot: Bot, start: vec3.Vec3, end: vec3.Vec3, range = 1, maxLoops = 100) {
-  const openList = []
+export interface PathNode {
+  position: vec3.Vec3
+  g: number
+  h: number
+  f: number
+  root?: PathNode
+}
+
+function pathfind(bot: Bot, start: vec3.Vec3, end: vec3.Vec3, range = 1, maxLoops = 100): PathNode[] {
+  const openList: PathNode[] = []
   const closedList = []
   const initDist = start.distanceTo(end)
   let loops = 0

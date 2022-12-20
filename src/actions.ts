@@ -1,9 +1,9 @@
-import * as pathfinder from "./pathfinder.js"
 import * as fs from "fs"
 import { Bot } from "./main.js"
 import * as mcfinder from "./mc-finder.js"
 import vec3 from "vec3"
 import { EquipmentDestination } from "mineflayer"
+import mineflayerPathfinder from "mineflayer-pathfinder"
 
 import _mcdata from "minecraft-data"
 const mcdata = _mcdata("1.16.5")
@@ -13,63 +13,17 @@ import prismarineItem from "prismarine-item"
 const tools = fs.readFileSync("tool-list.txt", "utf8").split("\r\n")
 const smelting = JSON.parse(fs.readFileSync("smelting.json", "utf8"))
 
-function sleep(time) {
+function sleep(time: number) {
   return new Promise((resolve) => setTimeout(resolve, time))
 }
 
-export async function pathfind(bot: Bot, position, range = 1, maxLoops = 300) {
-  const tracker = bot.tasks.length
+export async function pathfind(bot: Bot, position: vec3.Vec3, range = 1) {
   bot.tasks.push(`pathfind ${range}`)
+  const goal = new mineflayerPathfinder.goals.GoalNear(position.x, position.y, position.z, range)
 
-  if (bot.mcBot.entity.position.distanceTo(position) <= range) {
-    bot.tasks.pop()
-    return
-  }
+  bot.mcBot.pathfinder.setMovements(new mineflayerPathfinder.Movements(bot.mcBot, mcdata))
+  await bot.mcBot.pathfinder.goto(goal)
 
-  let botPosition = bot.mcBot.entity.position
-  let path = pathfinder.path(bot, bot.mcBot.entity.position, position, range, maxLoops)
-
-  if (!path.length) {
-    await sleep(2000)
-    botPosition = bot.mcBot.entity.position
-    path = pathfinder.path(bot, bot.mcBot.entity.position, position, range, maxLoops)
-  }
-
-  bot.path = {
-    path: path,
-    goal: position,
-    range: range,
-    maxLoops: maxLoops
-  }
-
-  const originalLength = path.length
-
-  while (botPosition.distanceTo(position) > range) {
-    path = bot.path.path
-    //path = pathfinder.path(bot, botPosition, position, range, maxLoops);
-
-    bot.tasks[tracker] = `pathfind ${path.length}/${originalLength} <${range}`
-
-    if (path.length) {
-      const distanceA = botPosition.distanceTo(path[path.length - 1].position)
-
-      /*if (path.length >= 2) {
-              console.log("Pos B");
-              let distanceB = botPosition.distanceTo(path[path.length-2].position);
-              if (distanceA > distanceB) bot.path.path.pop();
-          }*/
-
-      if (distanceA < 0.5) bot.path.path.pop()
-      if (path.length) pathfinder.walk(bot, path[path.length - 1].position)
-    }
-
-    await sleep(100)
-
-    botPosition = bot.mcBot.entity.position
-  }
-
-  bot.path = null
-  bot.mcBot.clearControlStates()
   bot.tasks.pop()
 }
 
@@ -82,7 +36,8 @@ export async function getItem(bot: Bot, item: string) {
 
   const blocks = bot.mcBot.findBlocks({
     matching: sourceBlocks,
-    point: bot.mcBot.entity.position.offset(0, bot.mcBot.entity.height, 0)
+    point: bot.mcBot.entity.position.offset(0, bot.mcBot.entity.height, 0),
+    maxDistance: 1024
   })
 
   if (blocks.length) {
@@ -214,7 +169,7 @@ async function prepareTable(bot: Bot, tableType: string) {
     matching: mcdata.blocksByName[tableType].id
   })
 
-  let tablePosition
+  let tablePosition: vec3.Vec3
 
   if (!table) {
     const blocks = bot.mcBot.findBlocks({
@@ -230,7 +185,7 @@ async function prepareTable(bot: Bot, tableType: string) {
 
       for (const entity of Object.values(bot.mcBot.entities)) {
         // This should be improved. I'll do it later.... maybe.
-        if (entity.position.distanceTo(b) <= 1) return false
+        if (entity.position.distanceTo(b) <= 2) return false
       }
 
       return !["air", "cave_air"].includes(below.name)
@@ -350,10 +305,9 @@ export async function collectItem(bot: Bot, itemName: string, quantity: number) 
   bot.tasks.push(`collect ${itemName} x${quantity}`)
 
   const item = mcdata.itemsByName[itemName]
-  const deposited = 0 //Keep track of items deposited into chests. (None for now because I haven't added that)
   if (!quantity) quantity = item.stackSize
 
-  while (bot.mcBot.inventory.count(item.id) + deposited < quantity) {
+  while (bot.mcBot.inventory.count(item.id) < quantity) {
     bot.tasks[tracker] = `collect ${itemName} ${bot.mcBot.inventory.count(item.id)}/${quantity}`
     await getItem(bot, itemName)
   }
@@ -363,14 +317,18 @@ export async function collectItem(bot: Bot, itemName: string, quantity: number) 
 
 export async function deposit(bot: Bot, position: vec3.Vec3) {
   bot.tasks.push(`deposit`)
+  const f = () => {
+    console.log("g")
+  }
+  f()
 
   await pathfind(bot, position, 4)
 
-  /*let chestBlock = bot.findBlock({
-  matching: mcdata.blocksByName['chest'].id,
-  maxDistance: 5,// This should be 2.
-      point: position,
-});*/
+  // let chestBlock = bot.findBlock({
+  //   matching: mcdata.blocksByName["chest"].id,
+  //   maxDistance: 5, // This should be 2.
+  //   point: position
+  // })
 
   const chestBlock = bot.mcBot.blockAt(position)
 
@@ -432,6 +390,7 @@ export async function give(bot: Bot, username: string, itemName: string, quantit
   bot.tasks.push(`give ${username} ${itemName} x${quantity}`)
 
   const player = bot.mcBot.players[username]
+  console.log(username, player ?? "not found")
   const itemID = mcdata.itemsByName[itemName]?.id
   if (!itemID) {
     bot.tasks.pop()
@@ -440,7 +399,7 @@ export async function give(bot: Bot, username: string, itemName: string, quantit
 
   await collectItem(bot, itemName, quantity)
 
-  await pathfind(bot, player.entity.position, 2.5, 300)
+  await pathfind(bot, player.entity.position, 2.5)
 
   await bot.mcBot.toss(itemID, null, quantity)
 

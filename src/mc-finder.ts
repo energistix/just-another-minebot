@@ -4,6 +4,7 @@ const mcdata = _mcdata("1.16.5")
 
 const blockLoot = mcdata.blockLoot
 const entityLoot = mcdata.entityLoot
+console.log(blockLoot["stone"])
 
 export function blocks(item: string) {
   const results = []
@@ -18,6 +19,7 @@ export function blocks(item: string) {
   }
   return results
 }
+
 export function mobs(item) {
   const results = []
 

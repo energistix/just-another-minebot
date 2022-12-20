@@ -1,15 +1,24 @@
 import { createBot, Bot as MCBot } from "mineflayer"
-import { pathfinder, ComputedPath } from "mineflayer-pathfinder"
 import vec3 from "vec3"
-// prettier-ignore
-import settings from "../settings.json" /* prettier-ignore */ assert /* prettier-ignore */ { type: "json" }
 import * as actions from "./actions.js"
+import { PathNode } from "./pathfinder.js"
+import _viewer from "prismarine-viewer"
+const mineflayerViewer = _viewer.mineflayer
+import { pathfinder } from "mineflayer-pathfinder"
+import { readFileSync } from "fs"
+
+const settings = JSON.parse(readFileSync("settings.json", "utf8"))
 
 const commands = []
 
 class Bot {
   mcBot: MCBot
-  path: any | null = null
+  path: {
+    path: PathNode[]
+    goal: vec3.Vec3
+    range: number
+    maxLoops: number
+  } | null = null
   static bots: Bot[] = []
   static commands: string[][] = []
   // TODO: find out what those are
@@ -25,24 +34,6 @@ class Bot {
 
     this.mcBot.on("kicked", (reason, loggedIn) => console.log(reason, loggedIn))
     this.mcBot.on("error", (err) => console.log(err))
-
-    this.mcBot.on("blockUpdate", this.updatePath.bind(this))
-    this.mcBot.on("chunkColumnLoad", this.updatePath.bind(this))
-    setInterval(this.updatePath.bind(this), 2000)
-  }
-  updatePath() {
-    //TODO: i'll figure out pathfinding later
-    // if (!this.path || !this.path.path.length) return
-    // //let start = this.path.path[this.path.path.length-1].position;
-    // const start = this.mcBot.entity.position
-    // const end = this.path.goal
-    // this.path.path = actions.pathfinder.path(
-    //   this.mcBot,
-    //   start,
-    //   end,
-    //   this.path.range,
-    //   this.path.maxLoops
-    // )
   }
 
   processCommand(username: string, message: string) {
@@ -82,7 +73,8 @@ class Bot {
     }
   }
 
-  runCommand(tokens) {
+  //TODO: username should not be default
+  runCommand(tokens, username = "energistix") {
     switch (tokens[0]) {
       case "break":
         actions.clearBlock(this, new vec3.Vec3(parseInt(tokens[1]), parseInt(tokens[2]), parseInt(tokens[3])))
@@ -94,7 +86,7 @@ class Bot {
         actions.collectItem(this, tokens[1], parseInt(tokens[2]))
         break
       case "come":
-        actions.pathfind(this, this.mcBot.players["energistix"].entity.position, 2.5, 300)
+        actions.pathfind(this, this.mcBot.players.energistix.entity.position, 2.5)
         break
       case "deposit": {
         //Deposit items into chest at position.
@@ -115,7 +107,7 @@ class Bot {
         actions.getItem(this, tokens[1])
         break
       case "give":
-        actions.give(this, tokens[1], tokens[2], parseInt(tokens[3] || "1"))
+        actions.give(this, username, tokens[2], parseInt(tokens[1] || "1"))
         break
       case "goto":
         //Go to specified position.
@@ -165,15 +157,18 @@ async function cosmicLooper() {
       console.log(`${bot.mcBot.username}:  ${bot.tasks.join(" > ")}`)
     }
   }
-  setTimeout(cosmicLooper, 100)
+  setTimeout(cosmicLooper, 1000)
 }
 
 new Bot()
 
 Bot.bots[0].mcBot.once("spawn", () => {
+  mineflayerViewer(Bot.bots[0].mcBot, { port: 3007, firstPerson: true })
   const bot = Bot.bots[0]
 
   bot.mcBot.on("chat", bot.processCommand.bind(bot))
   bot.mcBot.on("whisper", bot.processCommand.bind(bot))
   cosmicLooper()
 })
+
+cosmicLooper()
