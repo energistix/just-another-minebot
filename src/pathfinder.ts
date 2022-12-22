@@ -1,5 +1,5 @@
 import vec3 from "vec3"
-import { Bot } from "./main.js"
+import { Bot } from "./Bot.js"
 
 function neighbours(bot: Bot, p: vec3.Vec3) {
   const points = [p.offset(0, 0, -1), p.offset(0, 0, 1), p.offset(-1, 0, 0), p.offset(1, 0, 0)]

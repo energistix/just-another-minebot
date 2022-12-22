@@ -1,10 +1,7 @@
-import _mcdata from "minecraft-data"
-import { Bot } from "./main.js"
-const mcdata = _mcdata("1.16.5")
+import { Bot } from "./Bot.js"
+import mcdata from "./mcdataCustom.js"
 
-const blockLoot = mcdata.blockLoot
-const entityLoot = mcdata.entityLoot
-console.log(blockLoot["stone"])
+const { blockLoot, entityLoot } = mcdata
 
 export function blocks(item: string) {
   const results = []
@@ -20,7 +17,7 @@ export function blocks(item: string) {
   return results
 }
 
-export function mobs(item) {
+export function mobs(item: string) {
   const results = []
 
   for (const entityName of Object.keys(entityLoot)) {
@@ -34,7 +31,14 @@ export function mobs(item) {
   return results
 }
 
-export function recipes(bot: Bot, itemName: string, useTable = true) {
+interface Recipe {
+  delta: {
+    id: number
+    count: number
+  }[]
+}
+
+export function recipes(bot: Bot, itemName: string, useTable = true): Recipe[] {
   const item = mcdata.itemsByName[itemName]
   if (item) {
     if (useTable) {

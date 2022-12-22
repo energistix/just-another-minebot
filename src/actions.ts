@@ -1,5 +1,5 @@
 import * as fs from "fs"
-import { Bot } from "./main.js"
+import { Bot } from "./Bot.js"
 import * as mcfinder from "./mc-finder.js"
 import vec3 from "vec3"
 import { EquipmentDestination } from "mineflayer"
@@ -224,6 +224,9 @@ async function craftItem(bot: Bot, item: string) {
 
   const recipe = recipes[0] //This needs work.
 
+  console.log(1, recipe.delta)
+  //eslint-disable-next-line @typescript-eslint/ban-ts-comment
+  // @ts-ignore
   const needs = recipe.delta.filter((ingredient) => {
     return ingredient.count < 0
   })
@@ -282,7 +285,13 @@ function checkInventory(bot: Bot, itemName: string) {
   return items.filter((item) => item.name === itemName).length
 }
 
-function hasIngredients(bot: Bot, ingredients: _mcdata.Item[]) {
+function hasIngredients(
+  bot: Bot,
+  ingredients: {
+    count: number
+    id: number
+  }[]
+) {
   //bot.inventory.count(mcdata.itemsByName[name].id);
   console.log("Checking for ingredients:")
 
