@@ -1,12 +1,12 @@
-const mineflayer = require("mineflayer")
-const actions = require("./actions.js")
-const fs = require("fs")
-const vec3 = require("vec3")
+import mineflayer from "mineflayer"
+import fs from "fs"
+import vec3, { Vec3 } from "vec3"
+import pathfinder, { Point } from "./pathfinder.js"
 
 const settings = JSON.parse(fs.readFileSync("./settings.json", "utf8"))
 const mcdata = require("minecraft-data")("1.16.4")
 
-const bots = []
+const bots: ReturnType<mineflayer.createBot> = []
 const structures = []
 const commands = []
 
@@ -229,3 +229,13 @@ bots[0].once("spawn", () => {
   bot.on("whisper", processCommand)
   cosmicLooper()
 })
+
+export type Bot = mineflayer.Bot & {
+  task: string[]
+  path: {
+    path: Point[]
+    goal: Vec3
+    range: number
+    maxLoops: number
+  } | null
+}

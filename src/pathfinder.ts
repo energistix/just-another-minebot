@@ -3,17 +3,20 @@
     I'm putting it in here for testing.
 */
 
-const vec3 = require("vec3")
+import { Vec3 } from "vec3"
+import { createBot } from "mineflayer"
 
-function neighbours(bot, p) {
-  let points = [
+type Bot = ReturnType<typeof createBot>
+
+function neighbours(bot: Bot, p: Vec3) {
+  const points = [
     p.offset(0, 0, -1),
     p.offset(0, 0, 1),
     p.offset(-1, 0, 0),
     p.offset(1, 0, 0)
   ]
 
-  for (i in points) {
+  for (const i in points) {
     if (!clean(bot, points[i])) {
       points[i] = points[i].offset(0, 1, 0)
     } else if (clean(bot, points[i], 0, -1, 0)) {
@@ -22,8 +25,8 @@ function neighbours(bot, p) {
   }
 
   return points.filter((n) => {
-    let block = bot.blockAt(n.offset(0, -1, 0))
-    let height = block && block.shapes.length ? block.shapes[0][4] : 1
+    const block = bot.blockAt(n.offset(0, -1, 0))
+    const height = block && block.shapes.length ? block.shapes[0][4] : 1
 
     return (
       height <= 1 &&
@@ -34,13 +37,13 @@ function neighbours(bot, p) {
   })
 }
 
-function clean(bot, n, x = 0, y = 0, z = 0) {
-  let b = bot.blockAt(n.offset(x, y, z))
+function clean(bot: Bot, n: Vec3, x = 0, y = 0, z = 0) {
+  const b = bot.blockAt(n.offset(x, y, z))
   return b && (b.displayName.includes("Air") || b.material == "plant")
 }
 
-function gridWalk(bot, goal) {
-  let botPos = bot.entity.position
+function gridWalk(bot: Bot, goal: Vec3) {
+  const botPos = bot.entity.position
 
   goal = goal.offset(
     -bot.entity.position.x,
@@ -60,13 +63,21 @@ function gridWalk(bot, goal) {
   }
 }
 
-function pathfind(bot, start, end, range = 1, maxLoops = 100) {
-  let openList = []
-  let closedList = []
-  let initDist = start.distanceTo(end)
+export interface Point {
+  position: Vec3
+  g: number
+  h: number
+  f: number
+  root?: Point
+}
+
+function pathfind(bot: Bot, start: Vec3, end: Vec3, range = 1, maxLoops = 100) {
+  const openList: Point[] = []
+  const closedList = []
+  const initDist = start.distanceTo(end)
   let loops = 0
 
-  start = vec3(
+  start = new Vec3(
     Math.floor(start.x) + 0.5,
     Math.floor(start.y),
     Math.floor(start.z) + 0.5
@@ -89,7 +100,7 @@ function pathfind(bot, start, end, range = 1, maxLoops = 100) {
     closedList.push(point)
 
     if (point.position.distanceTo(end) < range) {
-      let path = []
+      const path = []
       while (point.root) {
         path.push(point)
         point = point.root
@@ -97,17 +108,17 @@ function pathfind(bot, start, end, range = 1, maxLoops = 100) {
       return path
     }
 
-    for (neighbour of neighbours(bot, point.position)) {
-      let onClosedList = closedList.find((obj) => {
+    for (const neighbour of neighbours(bot, point.position)) {
+      const onClosedList = closedList.find((obj) => {
         return obj.position.distanceTo(neighbour) < 0.1
       })
 
       if (!onClosedList) {
-        let g = point.g + 1
-        let h = neighbour.distanceTo(end)
-        let f = g + h
+        const g = point.g + 1
+        const h = neighbour.distanceTo(end)
+        const f = g + h
 
-        let babyPoint = {
+        const babyPoint = {
           position: neighbour,
           g: g,
           h: h,
@@ -115,7 +126,7 @@ function pathfind(bot, start, end, range = 1, maxLoops = 100) {
           root: point
         }
 
-        let previous = openList.find((obj) => {
+        const previous = openList.find((obj) => {
           return obj.position.distanceTo(neighbour) < 0.1
         })
 
@@ -134,7 +145,7 @@ function pathfind(bot, start, end, range = 1, maxLoops = 100) {
     let point = openList.reduce((p, c) => {
       return p.f < c.f ? p : c
     })
-    let path = []
+    const path = []
     while (point.root) {
       path.push(point)
       point = point.root
@@ -145,5 +156,7 @@ function pathfind(bot, start, end, range = 1, maxLoops = 100) {
   return []
 }
 
-exports.path = pathfind
-exports.walk = gridWalk
+export default {
+  path: pathfind,
+  walk: gridWalk
+}

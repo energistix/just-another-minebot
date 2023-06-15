@@ -1,19 +1,29 @@
-const mcdata = require("minecraft-data")("1.16.4")
-const Item = require("prismarine-item")("1.16.4")
-const pathfinder = require("./pathfinder.js")
-const vec3 = require("vec3")
-const mcfinder = require("./mc-finder.js")
-const fs = require("fs")
+import _mcdata, { RecipeItem } from "minecraft-data"
+const mcdata = _mcdata("1.16.4")
+
+import { Item } from "prismarine-item"
+
+import pathfinder from "./pathfinder.js"
+import vec3, { Vec3 } from "vec3"
+import mcfinder from "./mc-finder.js"
+import fs from "fs"
+import { Bot } from "./main.js"
+import { EquipmentDestination } from "mineflayer"
 
 const tools = fs.readFileSync("tool-list.txt", "utf8").split("\r\n")
 const smelting = JSON.parse(fs.readFileSync("smelting.json", "utf8"))
 
-function sleep(time) {
+function sleep(time: number) {
   return new Promise((resolve) => setTimeout(resolve, time))
 }
 
-const pathfind = async (bot, position, range = 1, maxLoops = 300) => {
-  let tracker = bot.task.length
+const pathfind = async (
+  bot: Bot,
+  position: Vec3,
+  range = 1,
+  maxLoops = 300
+) => {
+  const tracker = bot.task.length
   bot.task.push(`pathfind ${range}`)
 
   if (bot.entity.position.distanceTo(position) <= range) {
@@ -43,7 +53,7 @@ const pathfind = async (bot, position, range = 1, maxLoops = 300) => {
     maxLoops: maxLoops
   }
 
-  let originalLength = path.length
+  const originalLength = path.length
 
   while (botPosition.distanceTo(position) > range) {
     path = bot.path.path
@@ -52,7 +62,7 @@ const pathfind = async (bot, position, range = 1, maxLoops = 300) => {
     bot.task[tracker] = `pathfind ${path.length}/${originalLength} <${range}`
 
     if (path.length) {
-      let distanceA = botPosition.distanceTo(path[path.length - 1].position)
+      const distanceA = botPosition.distanceTo(path[path.length - 1].position)
 
       /*if (path.length >= 2) {
                 console.log("Pos B");
@@ -74,15 +84,16 @@ const pathfind = async (bot, position, range = 1, maxLoops = 300) => {
   bot.task.pop()
 }
 
-const clearBlock = async (bot, position) => {
+const clearBlock = async (bot: Bot, position: Vec3) => {
   bot.task.push("clear block")
 
   await pathfind(bot, position, 2)
 
-  let block = bot.blockAt(position)
+  const block = bot.blockAt(position)
+  if (!block) return bot.task.pop()
 
   if (bot.game.gameMode == "survival") {
-    let availableTools = bot.inventory.slots.filter((slot) => {
+    const availableTools = bot.inventory.slots.filter((slot) => {
       if (!slot) return
       return block.canHarvest(slot.type)
     })
@@ -90,7 +101,7 @@ const clearBlock = async (bot, position) => {
     if (availableTools.length) {
       await bot.equip(availableTools[0].type, "hand")
     } else if (!block.canHarvest(null)) {
-      let tool = tools.find((toolName) => {
+      const tool = tools.find((toolName) => {
         return block.canHarvest(mcdata.itemsByName[toolName].id)
       })
 
@@ -107,15 +118,19 @@ const clearBlock = async (bot, position) => {
   bot.task.pop()
 }
 
-function checkInventory(bot, itemName) {
-  let items = bot.inventory.items()
+function checkInventory(bot: Bot, itemName: string) {
+  const items = bot.inventory.items()
   return items.filter((item) => item.name === itemName).length
 }
 
-const equip = async (bot, item, slot = "hand") => {
+const equip = async (
+  bot: Bot,
+  item: string,
+  slot: EquipmentDestination = "hand"
+) => {
   bot.task.push(`equip ${item}`)
 
-  let itemType = mcdata.itemsByName[item].id
+  const itemType = mcdata.itemsByName[item].id
 
   if (!checkInventory(bot, item)) {
     if (bot.game.gameMode == "creative") {
@@ -129,7 +144,7 @@ const equip = async (bot, item, slot = "hand") => {
   bot.task.pop()
 }
 
-const placeBlock = async (bot, position, type = "dirt") => {
+const placeBlock = async (bot: Bot, position: Vec3, type = "dirt") => {
   bot.task.push("place block")
 
   await pathfind(bot, position, 4)
@@ -140,23 +155,33 @@ const placeBlock = async (bot, position, type = "dirt") => {
 
   await pathfind(bot, position, 4)
 
-  let referenceBlock = bot.blockAt(position.offset(0, -1, 0), false)
-  await bot.placeBlock(referenceBlock, vec3(0, 1, 0)).catch(console.log)
+  const referenceBlock = bot.blockAt(position.offset(0, -1, 0))
+  if (referenceBlock) {
+    await bot.placeBlock(referenceBlock, new Vec3(0, 1, 0)).catch(console.log)
+    return bot.task.pop()
+  } else {
+    const referenceBlock = bot.blockAt(position.offset(0, 1, 0))
+    if (referenceBlock) {
+      await bot
+        .placeBlock(referenceBlock, new Vec3(0, -1, 0))
+        .catch(console.log)
+    }
+  }
 
   bot.task.pop()
 }
 
-const prepareTable = async (bot, tableType) => {
+const prepareTable = async (bot: Bot, tableType: string) => {
   bot.task.push(`prepare ${tableType}`)
 
-  let table = bot.findBlock({
+  const table = bot.findBlock({
     matching: mcdata.blocksByName[tableType].id
   })
 
-  let tablePosition
+  let tablePosition: Vec3 | null = null
 
   if (!table) {
-    let blocks = bot.findBlocks({
+    const blocks = bot.findBlocks({
       maxDistance: 8,
       matching: [mcdata.blocksByName.air.id, mcdata.blocksByName.cave_air.id],
       count: 64
@@ -164,37 +189,37 @@ const prepareTable = async (bot, tableType) => {
 
     console.log(`Found ${blocks.length} air.`)
 
-    let block = blocks.find((b) => {
-      let below = bot.blockAt(b.offset(0, -1, 0))
+    const block = blocks.find((b) => {
+      const below = bot.blockAt(b.offset(0, -1, 0))
 
-      for (entity of Object.values(bot.entities)) {
+      for (const entity of Object.values(bot.entities)) {
         // This should be improved. I'll do it later.... maybe.
         if (entity.position.distanceTo(b) <= 1) return false
       }
 
-      return !["air", "cave_air"].includes(below.name)
+      return below && !["air", "cave_air"].includes(below.name)
     })
 
-    if (block) tablePosition = block
-    else console.log("Couldn't find a place to put the table.")
-
-    await placeBlock(bot, tablePosition, tableType)
+    if (block) {
+      tablePosition = block
+      await placeBlock(bot, tablePosition, tableType)
+    } else console.log("Couldn't find a place to put the table.")
   } else {
     tablePosition = table.position
   }
 
   bot.task.pop()
-  return tablePosition
+  return tablePosition as Vec3
 }
 
-const getItem = async (bot, item) => {
+const getItem = async (bot: Bot, item: string) => {
   bot.task.push(`get ${item}`)
 
-  let sourceBlocks = mcfinder.blocks(item).map((block) => {
+  const sourceBlocks = mcfinder.blocks(item).map((block) => {
     return mcdata.blocksByName[block].id
   })
 
-  let blocks = bot.findBlocks({
+  const blocks = bot.findBlocks({
     matching: sourceBlocks,
     point: bot.entity.position.offset(0, bot.entity.height, 0)
   })
@@ -203,7 +228,7 @@ const getItem = async (bot, item) => {
     await clearBlock(bot, blocks[0])
 
     for (let loops = 0; loops < 10; loops++) {
-      let drop = bot.nearestEntity((entity) => {
+      const drop = bot.nearestEntity((entity) => {
         return entity.name == "item"
       })
 
@@ -214,7 +239,7 @@ const getItem = async (bot, item) => {
       await sleep(100)
     }
   } else {
-    let recipes = mcfinder.recipes(bot, item)
+    const recipes = mcfinder.recipes(bot, item)
 
     if (smelting[item]) {
       await smeltItem(bot, smelting[item].sources[0])
@@ -229,14 +254,16 @@ const getItem = async (bot, item) => {
   bot.task.pop()
 }
 
-const hasIngredients = (bot, ingredients) => {
+const hasIngredients = (bot: Bot, ingredients: RecipeItem[]) => {
   //bot.inventory.count(mcdata.itemsByName[name].id);
   console.log("Checking for ingredients:")
 
-  for (ingredient of ingredients) {
+  for (const ingredient of ingredients) {
     //let name = mcdata.items[ingredient.id].name;
     //await collectItem(bot, name, -ingredient.count);
-    let got = bot.inventory.count(ingredient.id)
+    if (!ingredient) continue
+    //TODO: I'm here
+    let got = bot.inventory.count(ingredient.id, null)
     let get = -ingredient.count
 
     console.log(
@@ -251,7 +278,7 @@ const hasIngredients = (bot, ingredients) => {
   return true
 }
 
-const craftItem = async (bot, item) => {
+const craftItem = async (bot: Bot, item: string) => {
   bot.task.push(`craft ${item}`)
 
   let recipes = mcfinder.recipes(bot, item, false)
@@ -264,15 +291,15 @@ const craftItem = async (bot, item) => {
     usingTable = true
     console.log("Crafting table required.")
 
-    let tablePosition = await prepareTable(bot, "crafting_table")
+    const tablePosition = await prepareTable(bot, "crafting_table")
     craftingTable = bot.blockAt(tablePosition)
 
     recipes = mcfinder.recipes(bot, item, true)
   }
 
-  let recipe = recipes[0] //This needs work.
+  const recipe = recipes[0] //This needs work.
 
-  let needs = recipe.delta.filter((ingredient) => {
+  const needs = recipe.delta.filter((ingredient) => {
     return ingredient.count < 0
   })
 
